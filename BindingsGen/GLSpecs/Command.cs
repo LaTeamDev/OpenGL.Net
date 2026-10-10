@@ -512,7 +512,7 @@ namespace BindingsGen.GLSpecs
         private bool IsPinnedImplementation(RegistryContext ctx, List<CommandParameter> commandParams)
         {
             foreach (CommandParameter param in commandParams)
-                if (param.IsPinned(ctx, this))
+                if (param.IsPinned)
                     return true;
 
             return false;
@@ -786,17 +786,13 @@ namespace BindingsGen.GLSpecs
 
             #endregion
 
-            #region Unsafe Block (Open)
+            #region Fixed Block (Open)
 
-            if (fixedImplementation)
-            {
-                sw.WriteLine("unsafe {");                               // (1)
-                sw.Indent();
-
+            if (fixedImplementation) {
                 foreach (CommandParameter param in commandParams)
                     param.WriteFixedStatement(sw, ctx, this);
 
-                sw.WriteLine("{");                                      // (2)
+                sw.WriteLine("{");
                 sw.Indent();
             }
 
@@ -865,14 +861,12 @@ namespace BindingsGen.GLSpecs
 
             #endregion
 
-            #region Unsafe Block (Close)
+            #region Fixed Block (Close)
 
             if (fixedImplementation)
             {
                 sw.Unindent();
-                sw.WriteLine("}");                                      // (2) CLOSED
-                sw.Unindent();
-                sw.WriteLine("}");                                      // (1) CLOSED
+                sw.WriteLine("}");
             }
 
             #endregion
@@ -1029,14 +1023,7 @@ namespace BindingsGen.GLSpecs
             sw.WriteLine("{0} {1};", returnParameterType, ReturnVariableName);
 
             #endregion
-
-            #region Unsafe Block (Open)
-
-            sw.WriteLine("unsafe {");                               // (1)
-            sw.Indent();
-
-            #endregion
-
+            
             #region Delegate Call
 
             sw.WriteIdentation();
@@ -1096,13 +1083,6 @@ namespace BindingsGen.GLSpecs
             sw.WriteLine(");");
 
             #endregion
-
-            #endregion
-
-            #region Unsafe Block (Close)
-
-            sw.Unindent();
-            sw.WriteLine("}");                                      // (1) CLOSED
 
             #endregion
 
@@ -1336,10 +1316,6 @@ namespace BindingsGen.GLSpecs
             sw.WriteLine("{");
             sw.Indent();
 
-            // Unsafe block
-            sw.WriteLine("unsafe {");
-            sw.Indent();
-
             #region Local Variables
 
             string typedReferenceVarName = "ref" + SpecificationStyle.GetCamelCase(genericParam.Name);
@@ -1382,10 +1358,6 @@ namespace BindingsGen.GLSpecs
             sw.WriteLine();
 
             #endregion
-
-            // Unsafe block
-            sw.Unindent();
-            sw.WriteLine("}");
 
             // Implementation block
             sw.Unindent();

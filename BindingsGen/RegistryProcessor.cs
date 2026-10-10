@@ -638,7 +638,7 @@ namespace BindingsGen
 
 			Console.WriteLine("Generate version support class to {0}.", path);
 
-			using (SourceStreamWriter sw = new SourceStreamWriter(Path.Combine(Program.BasePath, path), false)) {
+			using (var sw = new SourceStreamWriter(path, false)) {
 				GenerateLicensePreamble(sw);
 
 				sw.WriteLine("using Khronos;");
