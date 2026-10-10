@@ -251,7 +251,7 @@ namespace BindingsGen
 			string orphanFile = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Orphans.cs");
 
 			if ((orphanCommands.Count != 0) || (orphanEnums.Count != 0)) {
-				GenerateSource(ctx, orphanFile, delegate(RegistryContext cctx, SourceStreamWriter sw) {
+				GenerateSource(ctx, orphanFile, (cctx, sw) => {
 					Console.WriteLine("\tGenerate {0} enumerants...", orphanEnums.Count);
 					foreach (Enumerant enumerant in orphanEnums) {
 						enumerant.GenerateSource(sw, ctx);
@@ -274,6 +274,8 @@ namespace BindingsGen
 
 		private static void GenerateCommandsDelegates(RegistryContext ctx, SourceStreamWriter sw, IEnumerable<Command> commands)
 		{
+			// not sure if it is necessary
+			sw.WriteLine("[SuppressUnmanagedCodeSecurity]");
 			sw.WriteLine("internal static unsafe partial class Delegates");
 			sw.WriteLine("{");
 			sw.Indent();
@@ -290,138 +292,135 @@ namespace BindingsGen
 			sw.WriteLine("}");
 		}
 
-		public void GenerateVbCommands(RegistryContext ctx)
-		{
-			Dictionary<string, bool> serializedCommands = new Dictionary<string, bool>();
-			Dictionary<string, bool> serializedEnums = new Dictionary<string, bool>();
-			List<Command> featureVbCommands = new List<Command>();
-			List<Enumerant> featureVbEnums = new List<Enumerant>();
-
-			Console.WriteLine("Testing for VB.Net incompatibilities.");
-
-			#region Select VB incompatible commands
-
-			foreach (IFeature feature in ctx.Registry.AllFeatures(ctx)) {
-				foreach (FeatureCommand featureCommand in feature.Requirements) {
-					if (featureCommand.Api != null && !ctx.IsSupportedApi(featureCommand.Api)) {
-						Console.WriteLine("Skip command: API {1} not supported", featureCommand.Api);
-						continue;
-					}
-						
-
-					foreach (FeatureCommand.Item featureCommandItem in featureCommand.Commands) {
-						Command command = ctx.Registry.GetCommand(featureCommandItem.Name);
-
-						Debug.Assert(command != null);
-						if (serializedCommands.ContainsKey(command.Prototype.Name))
-							continue;
-						serializedCommands.Add(command.Prototype.Name, true);
-
-						// Do not generate manually disabled command
-						if ((command.Flags & CommandFlags.Disable) != 0)
-							continue;
-						// Do not generate command with aliases
-						if (command.Alias != null)
-							continue;
-
-						// Do not generate methods not conflicting with enumerations having the same name with different case
-						Enumerant enumInConflict = ctx.Registry.GetEnumerantNoCase(command.GetImplementationName(ctx)); 
-						if (enumInConflict == null)
-							continue;
-						
-						// VB.Net command
-						featureVbCommands.Add(command);
-
-						if (serializedEnums.ContainsKey(enumInConflict.Name))
-							continue;
-						serializedEnums.Add(enumInConflict.Name, true);
-
-						// VB.Net enum
-						featureVbEnums.Add(enumInConflict);
-					}
-				}
-			}
-
-			#endregion
-
-			string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Vb.cs");
-
-			if (featureVbCommands.Count > 0) {
-				Console.WriteLine("Generate registry commands to {0}.", path);
-
-				using (SourceStreamWriter sw = new SourceStreamWriter(path, false)) {
-					GenerateLicensePreamble(sw);
-
-					// Warning CS1734  XML comment on 'method' has a paramref tag for 'param', but there is no parameter by that name
-					// sw.WriteLine("#pragma warning disable 1734");
-					// sw.WriteLine();
-
-					sw.WriteLine("#pragma warning disable 649, 1572, 1573");
-					sw.WriteLine();
-
-					sw.WriteLine("using System;");
-					sw.WriteLine("using System.Diagnostics;");
-					sw.WriteLine("using System.Runtime.InteropServices;");
-					sw.WriteLine("using System.Security;");
-					sw.WriteLine("using System.Text;");
-					sw.WriteLine("using Khronos;");
-					sw.WriteLine();
-
-					sw.WriteLine();
-
-					sw.WriteLine("namespace {0}", Namespace);
-					sw.WriteLine("{");
-					sw.Indent();
-
-					sw.WriteLine("/// <summary>");
-					sw.WriteLine("/// Class for scoping those methods conflicting with other fields/enums.");
-					sw.WriteLine("/// </summary>");
-					sw.WriteLine("public partial class {0}", ctx.Class);
-					sw.WriteLine("{");
-					sw.Indent();
-
-					// VB Commands class
-					sw.WriteLine("public static class VB");
-					sw.WriteLine("{");
-					sw.Indent();
-
-					// VB Function implementations
-					foreach (Command command in featureVbCommands) {
-						command.GenerateImplementations(sw, ctx);
-						sw.WriteLine();
-					}
-
-					sw.Unindent();
-					sw.WriteLine("}");
-
-					// VB Commands class
-					sw.WriteLine();
-					sw.WriteLine("public static class VBEnum");
-					sw.WriteLine("{");
-					sw.Indent();
-
-					// VB Function implementations
-					foreach (Enumerant enumerant in featureVbEnums) {
-						enumerant.GenerateSource(sw, ctx);
-						sw.WriteLine();
-					}
-
-					sw.Unindent();
-					sw.WriteLine("}");
-					sw.Unindent();
-
-					sw.Unindent();
-					sw.WriteLine("}");
-					sw.Unindent();
-
-					sw.WriteLine();
-					sw.WriteLine("}");
-				}
-			} else {
-				if (File.Exists(path))
-					File.Delete(path);
-			}
-		}
+		// public void GenerateVbCommands(RegistryContext ctx)
+		// {
+		// 	Dictionary<string, bool> serializedCommands = new Dictionary<string, bool>();
+		// 	Dictionary<string, bool> serializedEnums = new Dictionary<string, bool>();
+		// 	List<Command> featureVbCommands = new List<Command>();
+		// 	List<Enumerant> featureVbEnums = new List<Enumerant>();
+		//
+		// 	Console.WriteLine("Testing for VB.Net incompatibilities.");
+		//
+		// 	#region Select VB incompatible commands
+		//
+		// 	foreach (IFeature feature in ctx.Registry.AllFeatures(ctx)) {
+		// 		foreach (FeatureCommand featureCommand in feature.Requirements) {
+		// 			if (featureCommand.Api != null && !ctx.IsSupportedApi(featureCommand.Api)) {
+		// 				Console.WriteLine("Skip command: API {1} not supported", featureCommand.Api);
+		// 				continue;
+		// 			}
+		// 				
+		//
+		// 			foreach (FeatureCommand.Item featureCommandItem in featureCommand.Commands) {
+		// 				Command command = ctx.Registry.GetCommand(featureCommandItem.Name);
+		//
+		// 				Debug.Assert(command != null);
+		// 				if (serializedCommands.ContainsKey(command.Prototype.Name))
+		// 					continue;
+		// 				serializedCommands.Add(command.Prototype.Name, true);
+		//
+		// 				// Do not generate manually disabled command
+		// 				if ((command.Flags & CommandFlags.Disable) != 0)
+		// 					continue;
+		// 				// Do not generate command with aliases
+		// 				if (command.Alias != null)
+		// 					continue;
+		//
+		// 				// Do not generate methods not conflicting with enumerations having the same name with different case
+		// 				Enumerant enumInConflict = ctx.Registry.GetEnumerantNoCase(command.GetImplementationName(ctx)); 
+		// 				if (enumInConflict == null)
+		// 					continue;
+		// 				
+		// 				// VB.Net command
+		// 				featureVbCommands.Add(command);
+		//
+		// 				if (serializedEnums.ContainsKey(enumInConflict.Name))
+		// 					continue;
+		// 				serializedEnums.Add(enumInConflict.Name, true);
+		//
+		// 				// VB.Net enum
+		// 				featureVbEnums.Add(enumInConflict);
+		// 			}
+		// 		}
+		// 	}
+		//
+		// 	#endregion
+		//
+		// 	string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Vb.cs");
+		//
+		// 	if (featureVbCommands.Count > 0) {
+		// 		Console.WriteLine("Generate registry commands to {0}.", path);
+		//
+		// 		using (SourceStreamWriter sw = new SourceStreamWriter(path, false)) {
+		// 			GenerateLicensePreamble(sw);
+		//
+		// 			// Warning CS1734  XML comment on 'method' has a paramref tag for 'param', but there is no parameter by that name
+		// 			// sw.WriteLine("#pragma warning disable 1734");
+		// 			// sw.WriteLine();
+		//
+		// 			sw.WriteLine("#pragma warning disable 649, 1572, 1573");
+		// 			sw.WriteLine();
+		//
+		// 			sw.WriteLine("using System;");
+		// 			sw.WriteLine("using System.Diagnostics;");
+		// 			sw.WriteLine("using System.Runtime.InteropServices;");
+		// 			sw.WriteLine("using System.Security;");
+		// 			sw.WriteLine("using System.Text;");
+		// 			sw.WriteLine("using Khronos;");
+		// 			sw.WriteLine();
+		//
+		// 			sw.WriteLine();
+		//
+		// 			sw.WriteLine("namespace {0};", Namespace);
+		// 			sw.WriteLine();
+		//
+		// 			sw.WriteLine("/// <summary>");
+		// 			sw.WriteLine("/// Class for scoping those methods conflicting with other fields/enums.");
+		// 			sw.WriteLine("/// </summary>");
+		// 			sw.WriteLine("public unsafe partial class {0} {{", ctx.Class);
+		// 			sw.Indent();
+		//
+		// 			// VB Commands class
+		// 			sw.WriteLine("public unsafe static class VB {{");
+		// 			sw.Indent();
+		//
+		// 			// VB Function implementations
+		// 			foreach (Command command in featureVbCommands) {
+		// 				command.GenerateImplementations(sw, ctx);
+		// 				sw.WriteLine();
+		// 			}
+		//
+		// 			sw.Unindent();
+		// 			sw.WriteLine("}");
+		//
+		// 			// VB Commands class
+		// 			sw.WriteLine();
+		// 			sw.WriteLine("public unsafe static class VBEnum");
+		// 			sw.WriteLine("{");
+		// 			sw.Indent();
+		//
+		// 			// VB Function implementations
+		// 			foreach (Enumerant enumerant in featureVbEnums) {
+		// 				enumerant.GenerateSource(sw, ctx);
+		// 				sw.WriteLine();
+		// 			}
+		//
+		// 			sw.Unindent();
+		// 			sw.WriteLine("}");
+		// 			sw.Unindent();
+		//
+		// 			sw.Unindent();
+		// 			sw.WriteLine("}");
+		// 			sw.Unindent();
+		//
+		// 			sw.WriteLine();
+		// 			sw.WriteLine("}");
+		// 		}
+		// 	} else {
+		// 		if (File.Exists(path))
+		// 			File.Delete(path);
+		// 	}
+		// }
 
 		public void GenerateExtensionsSupportClass(RegistryContext ctx)
 		{
@@ -451,7 +450,7 @@ namespace BindingsGen
 				extensionFeatures.Add(feature);
 			}
 
-			using (SourceStreamWriter sw = new SourceStreamWriter(Path.Combine(Program.BasePath, path), false)) {
+			using (SourceStreamWriter sw = new SourceStreamWriter(path, false)) {
 				GenerateLicensePreamble(sw);
 
 				sw.WriteLine("// ReSharper disable InconsistentNaming");
@@ -462,14 +461,14 @@ namespace BindingsGen
 				sw.WriteLine("{");
 				sw.Indent();
 
-				sw.WriteLine("public partial class {0}", ctx.Class);
+				sw.WriteLine("public unsafe partial class {0}", ctx.Class);
 				sw.WriteLine("{");
 				sw.Indent();
 
 				sw.WriteLine("/// <summary>");
 				sw.WriteLine("/// Extension support listing.");
 				sw.WriteLine("/// </summary>");
-				sw.WriteLine("public partial class Extensions");
+				sw.WriteLine("public unsafe partial class Extensions");
 				sw.WriteLine("{");
 				sw.Indent();
 
@@ -560,27 +559,21 @@ namespace BindingsGen
 
 			Console.WriteLine("Generate API limits to {0}.", path);
 
-			using (SourceStreamWriter sw = new SourceStreamWriter(Path.Combine(Program.BasePath, path), false)) {
+			using (SourceStreamWriter sw = new SourceStreamWriter(path, false)) {
 				GenerateLicensePreamble(sw);
-
-				sw.WriteLine("using System;");
-				sw.WriteLine();
+				
 				sw.WriteLine("using Khronos;");
 				sw.WriteLine();
 
-				sw.WriteLine("namespace {0}", Namespace);
-				sw.WriteLine("{");
-				sw.Indent();
-
-				sw.WriteLine("public partial class {0}", ctx.Class);
-				sw.WriteLine("{");
+				sw.WriteLine("namespace {0};", Namespace);
+				sw.WriteLine();
+				sw.WriteLine("public unsafe partial class {0} {{", ctx.Class);
 				sw.Indent();
 
 				sw.WriteLine("/// <summary>");
 				sw.WriteLine("/// Limits support listing.");
 				sw.WriteLine("/// </summary>");
-				sw.WriteLine("public sealed partial class Limits");
-				sw.WriteLine("{");
+				sw.WriteLine("public sealed partial class Limits {");
 				sw.Indent();
 
 				foreach (Enumerant enumerant in limitEnums) {
@@ -651,12 +644,10 @@ namespace BindingsGen
 				sw.WriteLine("using Khronos;");
 				sw.WriteLine();
 
-				sw.WriteLine("namespace {0}", Namespace);
-				sw.WriteLine("{");
-				sw.Indent();
+				sw.WriteLine("namespace {0};", Namespace);
+				sw.WriteLine();
 
-				sw.WriteLine("public partial class {0}", ctx.Class);
-				sw.WriteLine("{");
+				sw.WriteLine("public unsafe partial class {0} {{", ctx.Class);
 				sw.Indent();
 
 				sw.WriteLine("#region Known Versions Constants");
@@ -761,12 +752,10 @@ namespace BindingsGen
 				sw.WriteLine("// ReSharper disable JoinDeclarationAndInitializer");
 				sw.WriteLine();
 
-				sw.WriteLine("namespace {0}", Namespace);
-				sw.WriteLine("{");
-				sw.Indent();
-
-				sw.WriteLine("public partial class {0}", ctx.Class);
-				sw.WriteLine("{");
+				sw.WriteLine("namespace {0};", Namespace);
+				sw.WriteLine();
+				
+				sw.WriteLine("public partial class {0} {{", ctx.Class);
 				sw.Indent();
 
 				// Function implementations
@@ -865,7 +854,7 @@ namespace BindingsGen
 				}
 			}
 
-			return (Path.Combine(Program.BasePath, path));
+			return path;
 		}
 
 		/// <summary>

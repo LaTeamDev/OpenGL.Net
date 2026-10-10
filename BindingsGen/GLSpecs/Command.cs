@@ -266,8 +266,6 @@ namespace BindingsGen.GLSpecs
             foreach (IFeature feature in RemovedBy)
                 sw.WriteLine(feature.GenerateRemovedByAttribute(classDefaultApi));
 
-            // Not yet sure if it is really necessary
-            sw.WriteLine("[SuppressUnmanagedCodeSecurity]");
 
             // return: MarshalAs
             switch (Prototype.Type)
@@ -709,8 +707,7 @@ namespace BindingsGen.GLSpecs
             // Signature - Parameters
             int paramCount = commandParams.FindAll(delegate (CommandParameter item) { return (!item.IsImplicit(ctx, this)); }).Count;
 
-            foreach (CommandParameter param in commandParams)
-            {
+            foreach (var param in commandParams) {
                 // Skip in signature implicit parameters
                 if (param.IsImplicit(ctx, this))
                     continue;
@@ -723,7 +720,7 @@ namespace BindingsGen.GLSpecs
                 if (paramModifier != null)
                     sw.Write("{0} ", paramModifier);
 
-                if ((paramCount == 1) && (param.IsManagedArray(ctx, this)) && ((Flags & CommandFlags.VariadicParams) != 0))
+                if ((paramCount == 1) && (param.IsSpan(ctx, this)) && ((Flags & CommandFlags.VariadicParams) != 0))
                     sw.Write("params ");
 
                 sw.Write("{0} {1}", param.GetImplementationType(ctx, this), param.ImplementationName);
@@ -1167,7 +1164,7 @@ namespace BindingsGen.GLSpecs
             CommandParameter genericParam = genericParameters[genericParameters.Count - 1];
             CommandParameter originalParam = Parameters[Parameters.Count - 1];
 
-            if (genericParam.IsManagedArray(ctx, this) == false)
+            if (!genericParam.IsSpan(ctx, this))
                 throw new NotSupportedException("generic parameter is not an array");
 
             // Change the argument in order to have a generic ref
@@ -1205,10 +1202,6 @@ namespace BindingsGen.GLSpecs
             if (genericParam.ModifierOverride == "out")
                 sw.WriteLine("{0} = default(T);", genericParam.ImplementationName);
 
-            // Unsafe block
-            sw.WriteLine("unsafe {");
-            sw.Indent();
-
             #region Delegate Call
 
             sw.WriteIdentation();
@@ -1243,9 +1236,7 @@ namespace BindingsGen.GLSpecs
             sw.WriteLine();
 
             #endregion
-
-            // Unsafe block
-            sw.Unindent();
+            
             sw.WriteLine("}");
 
             #region Call Log
@@ -1321,7 +1312,7 @@ namespace BindingsGen.GLSpecs
             CommandParameter genericParam = genericParameters[genericParameters.Count - 1];
             CommandParameter originalParam = Parameters[Parameters.Count - 1];
 
-            if (genericParam.IsManagedArray(ctx, this) == false)
+            if (genericParam.IsSpan(ctx, this) == false)
                 throw new NotSupportedException("generic parameter is not an array");
 
             // Change the argument in order to have a generic ref

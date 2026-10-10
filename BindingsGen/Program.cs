@@ -196,20 +196,6 @@ namespace BindingsGen {
 							ctx.RefPages.Add(gl2Documentation);
 							ctx.RefPages.Add(gles3Documentation);
 							ctx.RefPages.Add(gles1Documentation);
-
-							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
-								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
-							if (o.Commands)
-								glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-							if (o.Extensions)
-								glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-							if (o.Limits)
-								glRegistryProcessor.GenerateLimitsSupportClass(ctx);
-							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVbCommands(ctx);
-							glRegistryProcessor.GenerateLogMap(ctx,
-								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapGl.xml"));
 							break;
 						}
 						// OpenGL for Windows
@@ -217,32 +203,12 @@ namespace BindingsGen {
 							ctx = new RegistryContext("Wgl", "Wgl", Path.Combine(o.BasePath, "GLSpecs/wgl.xml"));
 							ctx.RefPages.Add(gl4Documentation);
 							ctx.RefPages.Add(gl2Documentation);
-
-							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
-								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
-							glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-							glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVbCommands(ctx);
-							glRegistryProcessor.GenerateLogMap(ctx,
-								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapWgl.xml"));
 							break;
 						// OpenGL for Unix
 						case GenType.Glx:
 							ctx = new RegistryContext("Glx", "Glx", Path.Combine(o.BasePath, "GLSpecs/glx.xml"));
 							ctx.RefPages.Add(gl4Documentation);
 							ctx.RefPages.Add(gl2Documentation);
-
-							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
-								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
-							glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-							glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVbCommands(ctx);
-							glRegistryProcessor.GenerateLogMap(ctx,
-								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapGlx.xml"));
 							break;
 						// EGL
 						case GenType.Egl: {
@@ -253,19 +219,23 @@ namespace BindingsGen {
 
 							ctx = new RegistryContext("Egl", "Egl", Path.Combine(o.BasePath, "GLSpecs/egl.xml"));
 							ctx.RefPages.Add(eglDocumentation);
-
-							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
-								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
-							glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-							glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-							glRegistryProcessor.GenerateVbCommands(ctx);
-							glRegistryProcessor.GenerateLogMap(ctx,
-								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapEgl.xml"));
 							break;
 						}
+						default: throw new IndexOutOfRangeException();
 					}
+					glRegistryProcessor = new RegistryProcessor(ctx.Registry);
+					glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
+						Path.Combine(o.OutputBasePath, $"{ctx.Class}.Enums.cs"));
+					if (o.Commands)
+						glRegistryProcessor.GenerateCommandsAndEnums(ctx);
+					if (o.Extensions)
+						glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
+					if (o.Limits)
+						glRegistryProcessor.GenerateLimitsSupportClass(ctx);
+					glRegistryProcessor.GenerateVersionsSupportClass(ctx);
+					// glRegistryProcessor.GenerateVbCommands(ctx); //TODO: add a flag
+					glRegistryProcessor.GenerateLogMap(ctx,
+						Path.Combine(o.OutputBasePath, $"KhronosLogMap{o.GenType}.xml"));
 				});
 		}
 

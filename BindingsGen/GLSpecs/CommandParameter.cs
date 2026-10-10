@@ -95,7 +95,7 @@ namespace BindingsGen.GLSpecs
 		/// combination of other command parameter values, and possibly current GL state as well.
 		/// </summary>
 		[XmlAttribute("len")]
-		public string Length;
+		public string? Length;
 
 		/// <summary>
 		/// The Type is optional, and contains text which is a valid type name found in Type, and indicates that this
@@ -332,17 +332,19 @@ namespace BindingsGen.GLSpecs
 
 		public string ModifierOverride;
 
-		public string GetImplementationTypeAttributes(RegistryContext ctx, Command parentCommand)
-		{
-			string implementationType = GetManagedImplementationType(parentCommand);
-			string implementationMod = GetImplementationTypeModifier(ctx, parentCommand);
-			string attribute = null;
-
+		public string GetImplementationTypeAttributes(RegistryContext ctx, Command parentCommand) {
+			var implementationType = GetManagedImplementationType(parentCommand);
+			var implementationMod = GetImplementationTypeModifier(ctx, parentCommand);
+			string? attribute = null;
+			if (IsConstant) 
+				return attribute;
+			if (parentCommand.IsGetImplementation(ctx) || (parentCommand.Flags & CommandFlags.OutParam) != 0)
+				return attribute;
 			// String + Length!=null && !IsConst -> [Out] StringBuilder (in Get commands)
-			if ((IsConstant == false) && (implementationType == "String") && (Length != null) && ((parentCommand.IsGetImplementation(ctx) || ((parentCommand.Flags & CommandFlags.OutParam) != 0))))
+			if (implementationType is "String" && Length is null)
 				attribute = "[Out]";
 			// Array && !IsConst -> [Out] T[] (in Get commands)
-			if ((IsConstant == false) && (implementationType.EndsWith("[]")) && ((implementationMod != "out") && (implementationMod != "ref")) && ((parentCommand.IsGetImplementation(ctx) || ((parentCommand.Flags & CommandFlags.OutParam) != 0))))
+			if (implementationType.EndsWith("[]") && implementationMod is not "out" and "ref")
 				attribute = "[Out]";
 
 			return attribute;
@@ -360,15 +362,14 @@ namespace BindingsGen.GLSpecs
 		/// In the case the <see cref="InputType"/> is a <code>void*</code>, is will be translated into <see cref="IntPtr"/>.
 		/// </para>
 		/// </remarks>
-		public string GetManagedImplementationType(Command parentCommand)
-		{
-			string implementationType = GetImportType(parentCommand);
-
-			implementationType = implementationType.Replace("*", "[]");
-
-			// void* > IntPtr
-			if (implementationType == "void[]")
-				implementationType = "IntPtr";
+		public string GetManagedImplementationType(Command parentCommand) {
+			var implementationType = GetImportType(parentCommand);
+			if (implementationType.EndsWith('*')) {
+				if (implementationType is "void*")
+					implementationType = "nint";
+				else
+					implementationType = $"Span<{implementationType[..^1]}>";
+			}
 
 			return implementationType;
 		}
@@ -546,9 +547,8 @@ namespace BindingsGen.GLSpecs
 
 		#region Code Generation - Common
 
-		public bool IsManagedArray(RegistryContext ctx, Command parentCommand)
-		{
-			return (GetImplementationType(ctx, parentCommand).EndsWith("[]"));
+		public bool IsSpan(RegistryContext ctx, Command parentCommand) {
+			return (GetImplementationType(ctx, parentCommand).StartsWith("Span<"));
 		}
 
 		public bool IsConstant
@@ -611,7 +611,7 @@ namespace BindingsGen.GLSpecs
 				case CommandParameterLengthMode.Constant:
 					// Note:
 					// - The argument must be an Array instance
-					if (IsManagedArray(ctx, parentCommand))
+					if (IsSpan(ctx, parentCommand))
 						sw.WriteLine("Debug.Assert({0}.Length >= {1});", ImplementationName, LengthConstant);
 					break;
 				case CommandParameterLengthMode.ArgumentMultiple:
@@ -619,7 +619,7 @@ namespace BindingsGen.GLSpecs
 
 					// Note:
 					// - The array must provide 'n' elements for each unit in counter parameter
-					if (IsManagedArray(ctx, parentCommand) && multiple > 1)
+					if (IsSpan(ctx, parentCommand) && multiple > 1)
 						sw.WriteLine("Debug.Assert({0}.Length > 0 && ({0}.Length % {1}) == 0, \"empty or not multiple of {1}\");", ImplementationName, multiple);
 					break;
 			}

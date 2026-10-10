@@ -283,7 +283,7 @@ namespace BindingsGen
 			Console.WriteLine("Scanning registry documentation ({0})...", Api ?? "?");
 
 			foreach (string documentationFile in Directory.GetFiles(path)) {
-				if (documentationFile.ToLowerInvariant().EndsWith(".xml") == false)
+				if (!documentationFile.ToLowerInvariant().EndsWith(".xml"))
 					continue;
 
 				try {
@@ -295,7 +295,7 @@ namespace BindingsGen
 					foreach (string command in docHandler.Commands) {
 						List<T> docHandlers;
 
-						if (_DocMapCommands.TryGetValue(command, out docHandlers) == false)
+						if (!_DocMapCommands.TryGetValue(command, out docHandlers))
 							_DocMapCommands[command] = docHandlers = new List<T>();
 						docHandlers.Add(docHandler);
 					}
@@ -303,7 +303,7 @@ namespace BindingsGen
 					foreach (string enumValue in docHandler.Enums) {
 						List<T> docHandlers;
 
-						if (_DocMapEnums.TryGetValue(enumValue, out docHandlers) == false)
+						if (!_DocMapEnums.TryGetValue(enumValue, out docHandlers))
 							_DocMapEnums[enumValue] = docHandlers = new List<T>();
 						docHandlers.Add(docHandler);
 					}
