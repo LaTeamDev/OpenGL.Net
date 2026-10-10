@@ -21,220 +21,253 @@ using System.IO;
 using Khronos;
 
 using BindingsGen.GLSpecs;
+using CommandLine;
 
-namespace BindingsGen
-{
+namespace BindingsGen {
 	/// <summary>
 	/// OpenGL bindings generator.
 	/// </summary>
-	internal class Program
-	{
+	internal class Program {
+		enum GlProfiles {
+			Core,
+			ES2,
+			SC2
+		}
+		enum GenType {
+			Gl,
+			Wgl,
+			Glx,
+			Egl
+		}
+
+		class Options {
+			[Option('d', "dummy", Required = false, HelpText = "Set output to generate dummies.")]
+			public bool DummyStream { get; set; }
+		}
+
+		[Verb("logmaps")]
+		class LogMapOptions {
+			[Value(0)]
+			public GenType Gen { get; set; }
+			/// <summary>
+			/// Base path to construct correct file paths.
+			/// </summary>
+			[Option('i', "input", HelpText = "Base path to construct correct file paths.", Required = true)]
+			public string BasePath { get; set; } = "../../../..";
+		}
+
+		[Verb("assembly")]
+		class AssemblyOptions {
+			[Value(0)]
+			public string? AssemblyPath { get; set; }
+
+			[Option("overwrite", Required = false, HelpText = "Overwrite assembly.")]
+			public bool AssemblyOverwrite { get; set; }
+
+			[Option("profile", Required = false, HelpText = "GL profile.")]
+			public GlProfiles[]? GlProfiles { get; set; }
+		}
+		[Verb("gen")]
+		class GenOptions {
+
+			[Option("nodoc", Required = false, HelpText = "Set output to not generate documentation.")]
+			public bool DocDisabled { get; set; }
+			
+			[Value(0)]
+			public GenType GenType { get; set; }
+			
+			[Option('c', "commands", Group = "gen")]
+			public bool Commands { get; set; }
+			[Option('e', "extensions", Group = "gen")]
+			public bool Extensions { get; set; }
+			[Option('l', "limits", Group = "gen")]
+			public bool Limits { get; set; }
+			
+			/// <summary>
+			/// Base path to construct correct file paths.
+			/// </summary>
+			[Option('i', "input", HelpText = "Base path to construct correct file paths.", Required = true)]
+			public string BasePath { get; set; }
+
+			/// <summary>
+			/// The directory where the output files are placed.
+			/// </summary>
+			[Option('o', "output", HelpText = "The directory where the output files are placed.", Required = true)]
+			public string OutputBasePath { get; set; }
+		}
+		
+		public static bool DummyStream { get; set; }
+		public static string BasePath { get; set; }
+		public static string OutputBasePath { get; set; }
+		
+
 		/// <summary>
 		/// Application entry point.
 		/// </summary>
 		/// <param name="args">
 		/// The command line invocation arguments.
 		/// </param>
-		private static void Main(string[] args)
-		{
+		private static void Main(string[] args) {
 			RegistryContext ctx;
 			RegistryProcessor glRegistryProcessor;
 			int index;
+			Parser.Default.ParseArguments<Options, LogMapOptions, AssemblyOptions, GenOptions>(args)
+				.WithParsed<Options>(o => DummyStream = o.DummyStream)
+				#region Assembly processing
 
-			DummyStream = Array.FindIndex(args, item => (item == "--dummy")) >= 0;
-			DocDisabled= Array.FindIndex(args, item => (item == "--nodoc")) >= 0;
+				.WithParsed<AssemblyOptions>(o => {
+					var cfgs = new List<RegistryAssemblyConfiguration>();
 
-			#region Assembly processing
-
-			if ((args.Length > 0) && ((index = Array.FindIndex(args, item => item == "--assembly")) >= 0)) {
-				string assemblyPath = args[index + 1];
-				bool overwriteAssembly = Array.Exists(args, item => item.StartsWith("--assembly-overwrite"));
-				bool profileOnlyOpts = Array.Exists(args, item => item.StartsWith("--profile-"));
-
-				List<RegistryAssemblyConfiguration> cfgs = new List<RegistryAssemblyConfiguration>();
-
-				if (profileOnlyOpts == false) {
-					cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.CoreProfile.xml"));
-					cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.ES2Profile.xml"));
-					cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.SC2Profile.xml"));
-				} else {
-					if (Array.Exists(args, item => (item.StartsWith("--profile-core"))))
+					if (o.GlProfiles is null) {
 						cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.CoreProfile.xml"));
-					if (Array.Exists(args, item => (item.StartsWith("--profile-es2"))))
 						cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.ES2Profile.xml"));
-					if (Array.Exists(args, item => (item.StartsWith("--profile-sc2"))))
 						cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.SC2Profile.xml"));
-				}
-
-				foreach (RegistryAssemblyConfiguration cfg in cfgs) {
-					try {
-						RegistryAssembly.CleanAssembly(assemblyPath, cfg, overwriteAssembly);
-					} catch (Exception exception) {
-						Console.WriteLine("Unable to process assembly: {0}.", exception);
 					}
-				}
-
-				// Exclusive option
-				return;
-			}
-
-			#endregion
-
-			#region Log Maps
-
-			if ((args.Length > 0) && (Array.FindIndex(args, item => item == "--only-logmaps") >= 0)) {
-				if ((args.Length == 1) || (Array.FindIndex(args, item => item == "--gl") >= 0)) {
-					Console.WriteLine("Generating GL log map...");
-					ctx = new RegistryContext("Gl", "Gl", Path.Combine(BasePath, "GLSpecs/gl.xml"));
-					glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-					glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapGl.xml"));
-				}
-
-				if ((args.Length == 1) || (Array.FindIndex(args, item => item == "--wgl") >= 0)) {
-					Console.WriteLine("Generating WGL log map...");
-					ctx = new RegistryContext("Wgl", "Wgl", Path.Combine(BasePath, "GLSpecs/wgl.xml"));
-					glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-					glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapWgl.xml"));
-				}
-
-				if ((args.Length == 1) || (Array.FindIndex(args, item => item == "--glx") >= 0)) {
-					Console.WriteLine("Generating GLX log map...");
-					ctx = new RegistryContext("Glx", "Glx", Path.Combine(BasePath, "GLSpecs/glx.xml"));
-					glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-					glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapGlx.xml"));
-				}
-
-				if ((args.Length == 1) || (Array.FindIndex(args, item => item == "--egl") >= 0)) {
-					Console.WriteLine("Generating EGL log map...");
-					ctx = new RegistryContext("Egl", "Egl", Path.Combine(BasePath, "GLSpecs/egl.xml"));
-					glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-					glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapEgl.xml"));
-				}
-
-				// Exclusive option
-				return;
-			}
-
-			#endregion
-
-			bool genGL = (args.Length == 0) || (Array.FindIndex(args, item => item == "--gl") >= 0);
-			bool genWGL = (args.Length == 0) || (Array.FindIndex(args, item => item == "--wgl") >= 0);
-			bool genGLX = (args.Length == 0) || (Array.FindIndex(args, item => item == "--glx") >= 0);
-			bool genEGL = (args.Length == 0) || (Array.FindIndex(args, item => item == "--egl") >= 0);
-
-			// (Common) Documentation
-			RegistryDocumentation<RegistryDocumentationHandlerGL4> gl4Documentation = new RegistryDocumentation<RegistryDocumentationHandlerGL4>();
-			RegistryDocumentation<RegistryDocumentationHandlerGL2> gl2Documentation = new RegistryDocumentation<RegistryDocumentationHandlerGL2>();
-
-			if (genGL || genWGL || genGLX) {
-				gl4Documentation.Api = "GL4";
-				if (DocDisabled == false)
-					gl4Documentation.ScanDocumentation(Path.Combine(BasePath, "RefPages/OpenGL/gl4"));
-
-				gl2Documentation.Api = "GL2.1";
-				if (DocDisabled == false)
-					gl2Documentation.ScanDocumentation(Path.Combine(BasePath, "RefPages/OpenGL/gl2.1"));
-			}
-
-			// XML-based specifications
-
-			// OpenGL
-			if (genGL) {
-				bool genGL_Features = true, genGL_Commands = false, genGL_Extensions = false, genGL_Limits = false;
-
-				foreach (string arg in Array.FindAll(args, item => (item.StartsWith("--gl-")))) {
-					switch (arg.Substring(5, arg.Length - 5)) {
-						case "commands":
-							genGL_Commands = true;
-							break;
-						case "extensions":
-							genGL_Extensions = true;
-							break;
-						case "limits":
-							genGL_Limits = true;
-							break;
+					else {
+						if (Array.Exists(o.GlProfiles, item => item == GlProfiles.Core))
+							cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.CoreProfile.xml"));
+						if (Array.Exists(o.GlProfiles, item => item == GlProfiles.ES2))
+							cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.ES2Profile.xml"));
+						if (Array.Exists(o.GlProfiles, item => item == GlProfiles.SC2))
+							cfgs.Add(RegistryAssemblyConfiguration.Load("BindingsGen.Profiles.SC2Profile.xml"));
 					}
-					genGL_Features = false;
-				}
 
-				// Additional ES documentation
-				RegistryDocumentation<RegistryDocumentationHandlerGL4> gles3Documentation =
-					new RegistryDocumentation<RegistryDocumentationHandlerGL4> { Api = "GLES3.2" };
-				if (DocDisabled == false)
-					gles3Documentation.ScanDocumentation(Path.Combine(BasePath, "RefPages/OpenGL/es3"));
+					foreach (var cfg in cfgs) {
+						try {
+							RegistryAssembly.CleanAssembly(o.AssemblyPath, cfg, o.AssemblyOverwrite);
+						}
+						catch (Exception exception) {
+							Console.Error.WriteLine(exception);
+						}
+					}
+				})
 
-				RegistryDocumentation<RegistryDocumentationHandlerGL2> gles1Documentation =
-					new RegistryDocumentation<RegistryDocumentationHandlerGL2> { Api = "GLES1.1" };
-				if (DocDisabled == false)
-					gles1Documentation.ScanDocumentation(Path.Combine(BasePath, "RefPages/OpenGL/es1.1"));
+				#endregion
 
-				Console.WriteLine("Loading GL specification...");
-				ctx = new RegistryContext("Gl", "Gl", Path.Combine(BasePath, "GLSpecs/gl.xml"));
-				ctx.RefPages.Add(gl4Documentation);
-				ctx.RefPages.Add(gl2Documentation);
-				ctx.RefPages.Add(gles3Documentation);
-				ctx.RefPages.Add(gles1Documentation);
+				#region Log Maps
 
-				glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-				glRegistryProcessor.GenerateStronglyTypedEnums(ctx, Path.Combine(BasePath, $"{OutputBasePath}/{ctx.Class}.Enums.cs"));
-				if (genGL_Features || genGL_Commands)
-					glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-				if (genGL_Features || genGL_Extensions)
-					glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-				if (genGL_Features || genGL_Limits)
-					glRegistryProcessor.GenerateLimitsSupportClass(ctx);
-				glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVbCommands(ctx);
-				glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapGl.xml"));
-			}
+				.WithParsed<LogMapOptions>(o => {
+					Console.WriteLine("Generating " + o.Gen + " log map...");
+					ctx = new RegistryContext("" + o.Gen, "" + o.Gen,
+						Path.Combine(o.BasePath, "GLSpecs/" + o.Gen.ToString().ToLower()));
+					glRegistryProcessor = new RegistryProcessor(ctx.Registry);
+					glRegistryProcessor.GenerateLogMap(ctx,
+						Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMap" + o.Gen + ".xml"));
+				})
 
-			// OpenGL for Windows
-			if (genWGL) {
-				ctx = new RegistryContext("Wgl", "Wgl", Path.Combine(BasePath, "GLSpecs/wgl.xml"));
-				ctx.RefPages.Add(gl4Documentation);
-				ctx.RefPages.Add(gl2Documentation);
+				#endregion
 
-				glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-				glRegistryProcessor.GenerateStronglyTypedEnums(ctx, Path.Combine(BasePath, $"{OutputBasePath}/{ctx.Class}.Enums.cs"));
-				glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-				glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVbCommands(ctx);
-				glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapWgl.xml"));
-			}
+				.WithParsed<GenOptions>(o => {
+					BasePath = o.BasePath;
+					OutputBasePath = o.OutputBasePath;
+					// (Common) Documentation
+					var gl4Documentation = new RegistryDocumentation<RegistryDocumentationHandlerGL4>();
+					var gl2Documentation = new RegistryDocumentation<RegistryDocumentationHandlerGL2>();
 
-			// OpenGL for Unix
-			if (genGLX) {
-				ctx = new RegistryContext("Glx", "Glx", Path.Combine(BasePath, "GLSpecs/glx.xml"));
-				ctx.RefPages.Add(gl4Documentation);
-				ctx.RefPages.Add(gl2Documentation);
+					if (o.GenType is GenType.Gl or GenType.Egl or GenType.Glx) {
+						gl4Documentation.Api = "GL4";
+						if (o.DocDisabled)
+							gl4Documentation.ScanDocumentation(Path.Combine(o.BasePath, "RefPages/OpenGL/gl4"));
 
-				glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-				glRegistryProcessor.GenerateStronglyTypedEnums(ctx, Path.Combine(BasePath, $"{OutputBasePath}/{ctx.Class}.Enums.cs"));
-				glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-				glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVbCommands(ctx);
-				glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapGlx.xml"));
-			}
+						gl2Documentation.Api = "GL2.1";
+						if (o.DocDisabled)
+							gl2Documentation.ScanDocumentation(Path.Combine(o.BasePath, "RefPages/OpenGL/gl2.1"));
+					}
 
-			// EGL
-			if (genEGL) {
-				RegistryDocumentation<RegistryDocumentationHandlerEGL> eglDocumentation =
-					new RegistryDocumentation<RegistryDocumentationHandlerEGL> { Api = "EGL" };
-				eglDocumentation.ScanDocumentation(Path.Combine(BasePath, "RefPages/EGL-Registry/sdk/docs/man"));
+					// XML-based specifications
 
-				ctx = new RegistryContext("Egl", "Egl", Path.Combine(BasePath, "GLSpecs/egl.xml"));
-				ctx.RefPages.Add(eglDocumentation);
+					switch (o.GenType) {
+						// OpenGL
+						case GenType.Gl: {
+							// Additional ES documentation
+							var gles3Documentation =
+								new RegistryDocumentation<RegistryDocumentationHandlerGL4> { Api = "GLES3.2" };
+							if (!o.DocDisabled)
+								gles3Documentation.ScanDocumentation(Path.Combine(o.BasePath, "RefPages/OpenGL/es3"));
 
-				glRegistryProcessor = new RegistryProcessor(ctx.Registry);
-				glRegistryProcessor.GenerateStronglyTypedEnums(ctx, Path.Combine(BasePath, $"{OutputBasePath}/{ctx.Class}.Enums.cs"));
-				glRegistryProcessor.GenerateCommandsAndEnums(ctx);
-				glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVersionsSupportClass(ctx);
-				glRegistryProcessor.GenerateVbCommands(ctx);
-				glRegistryProcessor.GenerateLogMap(ctx, Path.Combine(BasePath, "OpenGL.Net/KhronosLogMapEgl.xml"));
-			}
+							var gles1Documentation =
+								new RegistryDocumentation<RegistryDocumentationHandlerGL2> { Api = "GLES1.1" };
+							if (!o.DocDisabled)
+								gles1Documentation.ScanDocumentation(Path.Combine(o.BasePath, "RefPages/OpenGL/es1.1"));
+
+							Console.WriteLine("Loading GL specification...");
+							ctx = new RegistryContext("Gl", "Gl", Path.Combine(o.BasePath, "GLSpecs/gl.xml"));
+							ctx.RefPages.Add(gl4Documentation);
+							ctx.RefPages.Add(gl2Documentation);
+							ctx.RefPages.Add(gles3Documentation);
+							ctx.RefPages.Add(gles1Documentation);
+
+							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
+							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
+								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
+							if (o.Commands)
+								glRegistryProcessor.GenerateCommandsAndEnums(ctx);
+							if (o.Extensions)
+								glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
+							if (o.Limits)
+								glRegistryProcessor.GenerateLimitsSupportClass(ctx);
+							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVbCommands(ctx);
+							glRegistryProcessor.GenerateLogMap(ctx,
+								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapGl.xml"));
+							break;
+						}
+						// OpenGL for Windows
+						case GenType.Wgl:
+							ctx = new RegistryContext("Wgl", "Wgl", Path.Combine(o.BasePath, "GLSpecs/wgl.xml"));
+							ctx.RefPages.Add(gl4Documentation);
+							ctx.RefPages.Add(gl2Documentation);
+
+							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
+							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
+								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
+							glRegistryProcessor.GenerateCommandsAndEnums(ctx);
+							glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVbCommands(ctx);
+							glRegistryProcessor.GenerateLogMap(ctx,
+								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapWgl.xml"));
+							break;
+						// OpenGL for Unix
+						case GenType.Glx:
+							ctx = new RegistryContext("Glx", "Glx", Path.Combine(o.BasePath, "GLSpecs/glx.xml"));
+							ctx.RefPages.Add(gl4Documentation);
+							ctx.RefPages.Add(gl2Documentation);
+
+							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
+							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
+								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
+							glRegistryProcessor.GenerateCommandsAndEnums(ctx);
+							glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVbCommands(ctx);
+							glRegistryProcessor.GenerateLogMap(ctx,
+								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapGlx.xml"));
+							break;
+						// EGL
+						case GenType.Egl: {
+							var eglDocumentation =
+								new RegistryDocumentation<RegistryDocumentationHandlerEGL> { Api = "EGL" };
+							eglDocumentation.ScanDocumentation(Path.Combine(o.BasePath,
+								"RefPages/EGL-Registry/sdk/docs/man"));
+
+							ctx = new RegistryContext("Egl", "Egl", Path.Combine(o.BasePath, "GLSpecs/egl.xml"));
+							ctx.RefPages.Add(eglDocumentation);
+
+							glRegistryProcessor = new RegistryProcessor(ctx.Registry);
+							glRegistryProcessor.GenerateStronglyTypedEnums(ctx,
+								Path.Combine(o.BasePath, $"{o.OutputBasePath}/{ctx.Class}.Enums.cs"));
+							glRegistryProcessor.GenerateCommandsAndEnums(ctx);
+							glRegistryProcessor.GenerateExtensionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVersionsSupportClass(ctx);
+							glRegistryProcessor.GenerateVbCommands(ctx);
+							glRegistryProcessor.GenerateLogMap(ctx,
+								Path.Combine(o.BasePath, "OpenGL.Net/KhronosLogMapEgl.xml"));
+							break;
+						}
+					}
+				});
+		}
 
 #if SUPPORT_OPENWF
 
@@ -330,18 +363,4 @@ namespace BindingsGen
 #endif
 		}
 
-		public static bool DocDisabled;
-
-		public static bool DummyStream;
-
-		/// <summary>
-		/// Base path to construct correct file paths.
-		/// </summary>
-		public static readonly string BasePath = "../../../..";
-
-		/// <summary>
-		/// The directory where the output files are placed.
-		/// </summary>
-		public static string OutputBasePath = "OpenGL.Net";
 	}
-}

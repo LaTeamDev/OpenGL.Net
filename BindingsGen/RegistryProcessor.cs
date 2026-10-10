@@ -248,7 +248,7 @@ namespace BindingsGen
 				orphanEnums.Add(enumerant);
 			}
 
-			string orphanFile = Path.Combine(Program.BasePath, string.Format("{0}/{1}.Orphans.cs", Program.OutputBasePath, ctx.Class));
+			string orphanFile = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Orphans.cs");
 
 			if ((orphanCommands.Count != 0) || (orphanEnums.Count != 0)) {
 				GenerateSource(ctx, orphanFile, delegate(RegistryContext cctx, SourceStreamWriter sw) {
@@ -344,7 +344,7 @@ namespace BindingsGen
 
 			#endregion
 
-			string path = Path.Combine(Program.BasePath, string.Format("{0}/{1}.Vb.cs", Program.OutputBasePath, ctx.Class));
+			string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Vb.cs");
 
 			if (featureVbCommands.Count > 0) {
 				Console.WriteLine("Generate registry commands to {0}.", path);
@@ -425,7 +425,7 @@ namespace BindingsGen
 
 		public void GenerateExtensionsSupportClass(RegistryContext ctx)
 		{
-			string path = string.Format("{0}/{1}.Extensions.cs", Program.OutputBasePath, ctx.Class);
+			string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Extensions.cs");
 
 			Console.WriteLine("Generate registry khronosExtensions to {0}.", path);
 
@@ -524,7 +524,7 @@ namespace BindingsGen
 
 		public void GenerateLimitsSupportClass(RegistryContext ctx)
 		{
-			string path = string.Format("{0}/{1}.Limits.cs", Program.OutputBasePath, ctx.Class);
+			string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Limits.cs");
 
 			List<Enumerant> limitEnums = new List<Enumerant>();
 
@@ -641,7 +641,7 @@ namespace BindingsGen
 
 		public void GenerateVersionsSupportClass(RegistryContext ctx)
 		{
-			string path = string.Format("{0}/{1}.Versions.cs", Program.OutputBasePath, ctx.Class);
+			string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.Versions.cs");
 
 			Console.WriteLine("Generate version support class to {0}.", path);
 
@@ -850,18 +850,18 @@ namespace BindingsGen
 		/// </returns>
 		private static string GetFeatureFilePath(IFeature feature, RegistryContext ctx)
 		{
-			string path = string.Format("{0}/{1}.{2}.cs", Program.OutputBasePath, ctx.Class, feature.Name.Substring(ctx.Class.Length + 1));
-			string featureName = feature.Name.Substring(ctx.Class.Length + 1);
+			string path = Path.Combine(Program.OutputBasePath, $"{ctx.Class}.{feature.Name[(ctx.Class.Length + 1)..]}.cs");
+			string featureName = feature.Name[(ctx.Class.Length + 1)..];
 			int separatorIndex = featureName.IndexOf('_');
 
 			if (separatorIndex >= 0) {
-				string ext = featureName.Substring(0, separatorIndex);
+				string ext = featureName[..separatorIndex];
 
 				if (ctx.ExtensionsDictionary.HasWord(ext)) {
-					string extensionDir = Path.Combine(Program.BasePath, string.Format("{0}/{1}", Program.OutputBasePath, ext));
+					string extensionDir = Path.Combine(Program.OutputBasePath, ext);
 					if (!Directory.Exists(extensionDir))
 						Directory.CreateDirectory(extensionDir);
-					path = string.Format("{3}/{2}/{0}.{1}.cs", ctx.Class, featureName, ext, Program.OutputBasePath);
+					path = Path.Combine(Program.OutputBasePath, ext, $"{ctx.Class}.{featureName}.cs");
 				}
 			}
 

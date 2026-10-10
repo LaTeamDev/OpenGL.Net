@@ -1,20 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <RootNamespace>BindingsGen</RootNamespace>
     <AssemblyName>BindingsGen</AssemblyName>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <DefineConstants>TRACE;DEBUG;NETFRAMEWORK</DefineConstants>
     <WarningLevel>4</WarningLevel>
-    <Platform>AnyCPU</Platform>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <Title>Modern OpenGL bindings generator.</Title>
+    <Product>BindingsGen</Product>
+    <Copyright>Copyright © Luca Piccioni 2015</Copyright>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -24,7 +24,8 @@
 
   <ItemGroup>
     <!-- Mono.Cecil provides Mono.* types (TypeDefinition, MethodDefinition, CustomAttribute, etc.) -->
-    <PackageReference Include="Mono.Cecil" Version="0.11.4" />
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
   </ItemGroup>
 
   <ItemGroup>
